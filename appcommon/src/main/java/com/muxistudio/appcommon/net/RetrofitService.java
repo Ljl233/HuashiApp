@@ -11,19 +11,18 @@ import com.muxistudio.appcommon.data.BookPost;
 import com.muxistudio.appcommon.data.BookSearchResult;
 import com.muxistudio.appcommon.data.BorrowedBook;
 import com.muxistudio.appcommon.data.CalendarData;
-import com.muxistudio.appcommon.data.CardData;
+import com.muxistudio.appcommon.data.CardAccount;
+import com.muxistudio.appcommon.data.CardBalance;
 import com.muxistudio.appcommon.data.ClassRoom;
 import com.muxistudio.appcommon.data.Config;
 import com.muxistudio.appcommon.data.Course;
 import com.muxistudio.appcommon.data.CourseAdded;
 import com.muxistudio.appcommon.data.CourseAddedResponse;
-import com.muxistudio.appcommon.data.CourseId;
 import com.muxistudio.appcommon.data.CourseList;
 import com.muxistudio.appcommon.data.Detail;
-import com.muxistudio.appcommon.data.EleRequestData;
-import com.muxistudio.appcommon.data.Electricity;
+import com.muxistudio.appcommon.data.DormitoryList;
+import com.muxistudio.appcommon.data.ElectricityResponse;
 import com.muxistudio.appcommon.data.FeedBack;
-import com.muxistudio.appcommon.data.Hint;
 import com.muxistudio.appcommon.data.MapDetailList;
 import com.muxistudio.appcommon.data.Msg;
 import com.muxistudio.appcommon.data.News;
@@ -40,10 +39,7 @@ import com.muxistudio.appcommon.data.WebsiteData;
 import java.util.HashMap;
 import java.util.List;
 
-import okhttp3.ResponseBody;
-import retrofit2.Call;
 import retrofit2.Response;
-import retrofit2.adapter.rxjava.Result;
 import retrofit2.http.Body;
 import retrofit2.http.DELETE;
 import retrofit2.http.GET;
@@ -146,21 +142,23 @@ public interface RetrofitService {
     @GET("apartment/")
     Observable<List<ApartmentData>> getApartment();
 
-    @POST("ele/")
-    Observable<Response<Electricity>> getElectricity(@Body EleRequestData requestData);
+    @GET("ele/v2/dorms")
+    Observable<DormitoryList> getDormitory(@Query("building") String building);
+
+    @GET("ele/v2")
+    Observable<ElectricityResponse> getElectricity(@Query("building") String building, @Query("room") String room);
 
     //蹭课 搜索蹭课结果:
     @GET("lesson/")
     Observable<AuditCourse> getAuditCourse(@QueryMap HashMap<String, String> map);
 
-    //查询余额  除了学号其他传固定值 http://console.ccnu.edu
-    // .cn/ecard/getTrans?userId=2013211389&days=90&startNum=0&num=200
-    @GET("http://console.ccnu.edu.cn/ecard/getTrans")
-    Observable<List<CardData>> getCardBalance(
-            @Query("userId") String sid,
-            @Query("days") String day,
-            @Query("startNum") String start,
-            @Query("num") String num);
+    //查询校园卡余额
+    @GET("card/v1/balance")
+    Observable<CardBalance> getCardBalance();
+
+    //查询校园卡消费流水
+    @GET("card/v1/account")
+    Observable<CardAccount> getCardAccount(@Query("limit") String limit, @Query("page") String page, @Query("start") String start, @Query("end") String end);
 
     @GET("app/latest/")
     Observable<VersionData> getLatestVersion();
@@ -177,10 +175,9 @@ public interface RetrofitService {
     @GET("site/")
     Observable<List<WebsiteData>> getWebsite();
 
-    @GET("classroom/get_classroom/")
-    Observable<ClassRoom> getClassRoom(@Query("weekno") String week,
-                                       @Query("weekday") String day,
-
+    @GET("classroom/v2")
+    Observable<ClassRoom> getClassRoom(@Query("week") String week,
+                                       @Query("day") String day,
                                        @Query("building") String area);
 
     /**

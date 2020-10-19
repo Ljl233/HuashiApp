@@ -21,23 +21,17 @@ import com.google.gson.Gson;
 import com.muxistudio.appcommon.Constants;
 import com.muxistudio.appcommon.appbase.ToolbarActivity;
 import com.muxistudio.appcommon.data.Score;
-import com.muxistudio.appcommon.net.CampusFactory;
-import com.muxistudio.appcommon.utils.CommonTextUtils;
-import com.muxistudio.appcommon.widgets.LoadingDialog;
 import com.muxistudio.common.util.ToastUtil;
 import com.muxistudio.multistatusview.MultiStatusView;
 
 import net.muxi.huashiapp.R;
-import net.muxi.huashiapp.login.GetScorsePresenter;
+import net.muxi.huashiapp.login.CcnuCrawler3;
 import net.muxi.huashiapp.login.SingleCCNUClient;
-import net.muxi.huashiapp.ui.score.RequestRetry;
 import net.muxi.huashiapp.ui.score.adapter.ScoreCreditAdapter;
 import net.muxi.huashiapp.ui.score.dialogs.CreditGradeDialog;
 import net.muxi.huashiapp.utils.ScoreCreditUtils;
 
-import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -54,7 +48,6 @@ import rx.Observable;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
 
@@ -71,6 +64,7 @@ public class ScoreDisplayActivity extends ToolbarActivity {
     private CheckBox allChecked;
     private ScoreCreditAdapter mScoresAdapter;
 
+    private static int ifReLogin = 0;
     private final static String TAG = "getScores";
     private List<String> mCourseParams = new ArrayList<>();
     private List<String> mYearParams = new ArrayList<>();
@@ -109,13 +103,12 @@ public class ScoreDisplayActivity extends ToolbarActivity {
     }
 
     public void getScores() {
-        LoadingDialog loadingDialog = showLoading("正在请求成绩数据~~");
+       // LoadingDialog loadingDialog = showLoading("正在请求成绩数据~~");
         Observable<ResponseBody>[] scoreArray=new Observable[mYearParams.size()*mTermParams.size()];
         for (int i = 0; i <mYearParams.size() ; i++) {
             for (int j = 0; j <mTermParams.size() ; j++) {
                 scoreArray[i*mTermParams.size()+j] = SingleCCNUClient.getClient().getScores(mYearParams.get(i),mTermParams.get(j),false, String.valueOf(date.getTime()),100,1,"","asc",time.get() );
             }
-
         }
 
         subscription=Observable.merge(scoreArray)
@@ -124,7 +117,7 @@ public class ScoreDisplayActivity extends ToolbarActivity {
                 .subscribe(new Subscriber<ResponseBody>() {
                     @Override
                     public void onCompleted() {
-                        hideLoading();
+                        //hideLoading();
                         Log.i(TAG, "onCompleted: ");
                     }
 
@@ -134,7 +127,8 @@ public class ScoreDisplayActivity extends ToolbarActivity {
                         Log.i(TAG, "onError: ");
                         if (e instanceof HttpException) {
                             Log.e(TAG, "onError: response code"+((HttpException)e).code() );
-
+                            ToastUtil.showShort("学校服务器异常，不是匣子的锅QAQ");
+                            mMultiStatusView.showError();
                         }
                         e.printStackTrace();
                     }
@@ -150,9 +144,17 @@ public class ScoreDisplayActivity extends ToolbarActivity {
                         try {
                             scoreList = ScoreCreditUtils.getScoreFromJson(responseBody.string());
                         } catch (JSONException e) {
-                            e.printStackTrace();
-                            ToastUtil.showShort(R.string.score_error_1);
-                            mMultiStatusView.showError();
+                            if ( e.getMessage().equals("cookie expired") && ifReLogin == 0) {
+                                //如果cookie过期 获取成绩失败，要重新登陆
+                                ifReLogin = 1;
+                                performLogin();
+                                onError(e);
+                            } else {
+                                e.printStackTrace();
+                                hideLoading();
+                                ToastUtil.showShort(R.string.score_error_1);
+                                mMultiStatusView.showError();
+                            }
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -164,8 +166,40 @@ public class ScoreDisplayActivity extends ToolbarActivity {
                         }
                     }
                 });
+    }
 
+    //cookie如果失效 需要重新登陆
+    public void performLogin () {
+        CcnuCrawler3 ccnuCrawler3 = new CcnuCrawler3();
+        ccnuCrawler3.performLoginSystem(new Subscriber<ResponseBody>() {
+            @Override
+            public void onCompleted() {
+                Log.i(TAG, "onCompleted: ");
+                ccnuCrawler3.getClient().saveCookieToLocal();
+                getScores();
+            }
 
+            @Override
+            public void onError(Throwable e) {
+                if (e instanceof HttpException) {
+                    Log.e(TAG, "onError: httpexception code " + ((HttpException) e).response().code());
+                    try {
+                        Log.e(TAG, "onError:  httpexception errorbody: " + ((HttpException) e).response().errorBody().string());
+                    } catch (Exception e1) {
+                        e1.printStackTrace();
+                    }
+                } else if (e instanceof NullPointerException)
+                    Log.e(TAG, "onError: null   " + e.getMessage());
+                else
+                    Log.e(TAG, "onError: ");
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onNext(ResponseBody responseBody) {
+                Log.i(TAG, "onNext: " + "login success");
+            }
+        });
 
     }
 
@@ -206,6 +240,7 @@ public class ScoreDisplayActivity extends ToolbarActivity {
             }
         }
 
+        hideLoading();
         if (filteredList.isEmpty()) {
             mMultiStatusView.showEmpty();
             return true;
@@ -324,13 +359,16 @@ public class ScoreDisplayActivity extends ToolbarActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_score_display);
+
+        ifReLogin = 0;
+
         slideFromBottom(this);
         //获取解析 mYear mTerm params
         getParams();
         initView();
         //performLogin();
 
-
+        showLoading("正在请求成绩数据~~");
         getScores();
     }
 

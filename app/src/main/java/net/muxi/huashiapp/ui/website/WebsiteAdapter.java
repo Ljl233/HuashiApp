@@ -1,5 +1,6 @@
 package net.muxi.huashiapp.ui.website;
 
+import android.annotation.SuppressLint;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -31,6 +32,16 @@ public class WebsiteAdapter extends RecyclerView.Adapter<WebsiteAdapter.MySiteVi
         this.mWebsiteDataList = websiteData;
     }
 
+    public void refreshData(List<WebsiteData> websiteData) {
+        if ( mWebsiteDataList.size() > 0 ) {
+            int preSize = mWebsiteDataList.size();
+            mWebsiteDataList.clear();
+            notifyItemRangeRemoved(0, preSize);
+        }
+        mWebsiteDataList.addAll(websiteData);
+        notifyItemRangeInserted(0, websiteData.size());
+    }
+
     @Override
     public MySiteViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_website, parent, false);
@@ -39,7 +50,7 @@ public class WebsiteAdapter extends RecyclerView.Adapter<WebsiteAdapter.MySiteVi
 
 
     @Override
-    public void onBindViewHolder(MySiteViewHolder holder, final int position) {
+    public void onBindViewHolder(MySiteViewHolder holder, @SuppressLint("RecyclerView") final int position) {
         holder.mWebsiteSite.setText(mWebsiteDataList.get(position).getSite());
         holder.mWebsiteLayout.setOnClickListener(new View.OnClickListener() {
             @Override
